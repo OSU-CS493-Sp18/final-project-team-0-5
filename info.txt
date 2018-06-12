@@ -1,0 +1,27 @@
+spell:
+{
+  "userid": "user2",
+  "name": "HYPER BEAM!",
+  "school_fid": 3
+}
+
+school:
+{
+  "name": "Transconjurfiguration"
+  "description": "A disaster of combining things"
+}
+
+class:
+{
+  "name": "Swordsman",
+  "primary_attribute_fid": 1,
+  "save_attribute_one_fid": 1,
+  "save_attribute_two_fid": 3
+}
+
+
+attribute:
+{
+  "name": "Willpower",
+  "description": "Sheer power of anyone named Will"
+}
