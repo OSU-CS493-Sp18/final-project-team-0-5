@@ -16,13 +16,13 @@ const classSchema = {
  * Executes a MySQL query to insert a new class into the database.  Returns
  * a Promise that resolves to the ID of the newly-created class entry.
  */
-function insertNewClass(class, mysqlPool) {
+function insertNewClass(_class, mysqlPool) {
   return new Promise((resolve, reject) => {
-    class = validation.extractValidFields(class, classSchema);
-    class.id = null;
+    _class = validation.extractValidFields(_class, classSchema);
+    _class.id = null;
     mysqlPool.query(
       'INSERT INTO classes SET ?',
-      class,
+      _class,
       function (err, result) {
         if (err) {
           reject(err);
@@ -40,11 +40,7 @@ function insertNewClass(class, mysqlPool) {
 router.post('/', function (req, res, next) {
   const mysqlPool = req.app.locals.mysqlPool;
   if (validation.validateAgainstSchema(req.body, classSchema)) {
-    /*
-     * Make sure the user is not trying to class the same business twice.
-     * If they're not, then insert their class into the DB.
-     */
-    insertNewClass(class, mysqlPool)
+    insertNewClass(req.body, mysqlPool)
       .then((id) => {
         res.status(201).json({
           id: id,
@@ -96,9 +92,9 @@ router.get('/:classID', function (req, res, next) {
   const mysqlPool = req.app.locals.mysqlPool;
   const classID = parseInt(req.params.classID);
   getClassByID(classID, mysqlPool)
-    .then((class) => {
-      if (class) {
-        res.status(200).json(class);
+    .then((_class) => {
+      if (_class) {
+        res.status(200).json(_class);
       } else {
         next();
       }
@@ -115,10 +111,10 @@ router.get('/:classID', function (req, res, next) {
  * Returns a Promise that resolves to true if the class specified by
  * `classID` existed and was successfully updated or to false otherwise.
  */
-function replaceClassByID(classID, class, mysqlPool) {
+function replaceClassByID(classID, _class, mysqlPool) {
   return new Promise((resolve, reject) => {
-    class = validation.extractValidFields(class, classSchema);
-    mysqlPool.query('UPDATE classes SET ? WHERE id = ?', [ class, classID ], function (err, result) {
+    _class = validation.extractValidFields(_class, classSchema);
+    mysqlPool.query('UPDATE classes SET ? WHERE id = ?', [ _class, classID ], function (err, result) {
       if (err) {
         reject(err);
       } else {

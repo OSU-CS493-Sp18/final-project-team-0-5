@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
+const ObjectId = require('mongodb').ObjectId;
 
-const { getSpellsByUserID } = require('./spells');
 const { generateAuthToken, requireAuthentication } = require('../lib/auth');
 
 
@@ -140,7 +140,7 @@ function getUserByID(userID, mongoDB) {
  */
 router.get('/:userID/spells', requireAuthentication, function (req, res) {
   const mysqlPool = req.app.locals.mysqlPool;
-  const userID = parseInt(req.params.userID);
+  const userID = req.params.userID;
   getSpellsByUserID(userID, mysqlPool)
     .then((spells) => {
       if (spells) {
@@ -150,20 +150,34 @@ router.get('/:userID/spells', requireAuthentication, function (req, res) {
       }
     })
     .catch((err) => {
+		  console.log(err);
       res.status(500).json({
         error: "Unable to fetch spells.  Please try again later."
       });
     });
 });
 
-function addSpellToUser(spellID, userID, mongoDB) {
-  const usersCollection = mongoDB.collection('users');
-  const query = generateUserIDQuery(userID);
-  return usersCollection.updateOne(
-    query,
-    { $push: { spells: spellID } }
-  ).then(() => {
-    return Promise.resolve(spellID);
+
+/*
+ * Executes a MySQL query to fetch all spells by a specified user, based on
+ * on the user's ID.  Returns a Promise that resolves to an array containing
+ * the requested spells.  This array could be empty if the specified user
+ * does not have any spells.  This function does not verify that the specified
+ * user ID corresponds to a valid user.
+ */
+function getSpellsByUserID(userID, mysqlPool) {
+  return new Promise((resolve, reject) => {
+    mysqlPool.query(
+      'SELECT * FROM spells WHERE userid = ?',
+      [ userID ],
+      function (err, results) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(results);
+        }
+      }
+    );
   });
 }
 
@@ -171,4 +185,3 @@ function addSpellToUser(spellID, userID, mongoDB) {
 
 exports.router = router;
 exports.getUserByID = getUserByID;
-exports.addSpellToUser = addSpellToUser;

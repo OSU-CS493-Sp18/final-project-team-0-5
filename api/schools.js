@@ -38,7 +38,7 @@ function insertNewSchool(school, mysqlPool) {
 router.post('/', function (req, res, next) {
   const mysqlPool = req.app.locals.mysqlPool;
   if (validation.validateAgainstSchema(req.body, schoolSchema)) {
-    insertNewSchool(school, mysqlPool)
+    insertNewSchool(req.body, mysqlPool)
       .then((id) => {
         res.status(201).json({
           id: id,

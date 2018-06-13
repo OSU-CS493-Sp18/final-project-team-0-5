@@ -1,7 +1,9 @@
 const router = require('express').Router();
 const validation = require('../lib/validation');
+const ObjectId = require('mongodb').ObjectId;
 
-const { addSpellToUser, getUserByID } = require('./users');
+const { generateAuthToken, requireAuthentication } = require('../lib/auth');
+const { getUserByID } = require('./users');
 
 /*
  * Schema describing required/optional fields of a spell object.
@@ -16,7 +18,7 @@ const spellSchema = {
  * Executes a MySQL query to insert a new spell into the database.  Returns
  * a Promise that resolves to the ID of the newly-created spell entry.
  */
-function insertNewSpell(spell, mysqlPool) {
+function insertNewSpell(spell, mysqlPool, mongoDB) {
   return new Promise((resolve, reject) => {
     spell = validation.extractValidFields(spell, spellSchema);
     spell.id = null;
@@ -31,6 +33,17 @@ function insertNewSpell(spell, mysqlPool) {
         }
       }
     );
+  }).then((id) => {
+		return addSpellToUser(id, spell.userid, mongoDB);
+  });
+}
+
+function addSpellToUser(spellID, userID, mongoDB) {
+  const usersCollection = mongoDB.collection('users');
+  const query = generateUserIDQuery(userID);
+  return usersCollection.updateOne(query,{ $push: { spells: spellID } }
+  ).then(() => {
+    return Promise.resolve(spellID);
   });
 }
 
@@ -41,10 +54,9 @@ router.post('/', function (req, res, next) {
   const mysqlPool = req.app.locals.mysqlPool;
   const mongoDB = req.app.locals.mongoDB;
   if (validation.validateAgainstSchema(req.body, spellSchema)) {
-	if (getUserByID(req.body.userid, mongoDB) {
-		insertNewSpell(req.body, mysqlPool)
+	if (getUserByID(req.body.userid, mongoDB)) {
+		insertNewSpell(req.body, mysqlPool, mongoDB)
 		  .then((id) => {
-	        addSpellToUser(id, req.body.userid, mongoDB);
 			res.status(201).json({
 			  id: id,
 			  links: {
@@ -53,6 +65,7 @@ router.post('/', function (req, res, next) {
 			});
 		  })
 		  .catch((err) => {
+				console.log(err);
 			res.status(500).json({
 			  error: "Error inserting spell into DB.  Please try again later."
 			});
@@ -79,7 +92,7 @@ function getSpellByID(spellID, mysqlPool) {
   const sql = 'SELECT S.id AS id, S.userid AS user, S.name AS name, SC.name AS school, SC.id AS school_fid FROM spells S ' +
 	          'INNER JOIN schools SC ON SC.id = S.school_fid WHERE S.id = ?';
   return new Promise((resolve, reject) => {
-    mysqlPool.query(, [ spellID ], function (err, results) {
+    mysqlPool.query(sql, [ spellID ], function (err, results) {
       if (err) {
         reject(err);
       } else {
@@ -131,7 +144,7 @@ function replaceSpellByID(spellID, spell, mysqlPool) {
 /*
  * Route to update a spell.
  */
-router.put('/:spellID', function (req, res, next) {
+router.put('/:spellID', requireAuthentication, function (req, res, next) {
   const mysqlPool = req.app.locals.mysqlPool;
   const spellID = parseInt(req.params.spellID);
   if (validation.validateAgainstSchema(req.body, spellSchema)) {
@@ -172,12 +185,14 @@ router.put('/:spellID', function (req, res, next) {
  * a Promise that resolves to true if the spell specified by `spellID`
  * existed and was successfully deleted or to false otherwise.
  */
-function deleteSpellByID(spellID, mysqlPool) {
+function deleteSpellByID(spellID, mysqlPool, mongoDB) {
+  usersCollection = mongoDB.collection('users');
   return new Promise((resolve, reject) => {
     mysqlPool.query('DELETE FROM spells WHERE id = ?', [ spellID ], function (err, result) {
       if (err) {
         reject(err);
       } else {
+		usersCollection.update({}, {$pull: {spells: spellID}}, {multi: true});
         resolve(result.affectedRows > 0);
       }
     });
@@ -188,10 +203,11 @@ function deleteSpellByID(spellID, mysqlPool) {
 /*
  * Route to delete a spell.
  */
-router.delete('/:spellID', function (req, res, next) {
+router.delete('/:spellID', requireAuthentication, function (req, res, next) {
   const mysqlPool = req.app.locals.mysqlPool;
+  const mongoDB = req.app.locals.mongoDB;
   const spellID = parseInt(req.params.spellID);
-  deleteSpellByID(spellID, mysqlPool)
+  deleteSpellByID(spellID, mysqlPool, mongoDB)
     .then((deleteSuccessful) => {
       if (deleteSuccessful) {
         res.status(204).end();
@@ -206,52 +222,14 @@ router.delete('/:spellID', function (req, res, next) {
     });
 });
 
-/*
- * Executes a MySQL query to fetch all spells for a specified business, based
- * on the business's ID.  Returns a Promise that resolves to an array
- * containing the requested spells.  This array could be empty if the
- * specified business does not have any spells.  This function does not verify
- * that the specified business ID corresponds to a valid business.
- */
-function getSpellsByBusinessID(businessID, mysqlPool) {
-  return new Promise((resolve, reject) => {
-    mysqlPool.query(
-      'SELECT * FROM spells WHERE school_fid = ?',
-      [ businessID ],
-      function (err, results) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(results);
-        }
-      }
-    );
-  });
+
+function generateUserIDQuery(userID) {
+	if (ObjectId.isValid(userID)) {
+		return { _id: new ObjectId(userID) };
+	} else {
+		return { userID: userID };
+	}
 }
 
-/*
- * Executes a MySQL query to fetch all spells by a specified user, based on
- * on the user's ID.  Returns a Promise that resolves to an array containing
- * the requested spells.  This array could be empty if the specified user
- * does not have any spells.  This function does not verify that the specified
- * user ID corresponds to a valid user.
- */
-function getSpellsByUserID(userID, mysqlPool) {
-  return new Promise((resolve, reject) => {
-    mysqlPool.query(
-      'SELECT * FROM spells WHERE userid = ?',
-      [ userID ],
-      function (err, results) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(results);
-        }
-      }
-    );
-  });
-}
 
 exports.router = router;
-exports.getSpellsByBusinessID = getSpellsByBusinessID;
-exports.getSpellsByUserID = getSpellsByUserID;

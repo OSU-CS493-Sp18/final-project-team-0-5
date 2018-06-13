@@ -1,13 +1,40 @@
+
+docker run --rm -it --network final_default mysql:5 mysql -h final_mysql_1 -u dnd -p
+
+docker exec -it final_mongo_1 bash -l
+mongo -u user -p --authenticationDatabase admin
+
+db.createUser({user:"user",pwd:"pass",roles:[{role:"readWrite", db:"users"}]})
+
+db.users.insertOne({userID: "user1", name: "name", email:"email", password:"pwd", spells: []})
+
+
+http://192.168.99.100:8000/users
+create user
+{
+  "userID": "user3",
+  "name": "name3",
+  "email": "asdf",
+  "password": "pass",
+  "spells": []
+}
+
+http://192.168.99.100:8000/users/login
+{
+  "userID": "user3",
+  "password": "pass"
+}
+
 spell:
 {
-  "userid": "user2",
+  "userid": "user3",
   "name": "HYPER BEAM!",
   "school_fid": 3
 }
 
 school:
 {
-  "name": "Transconjurfiguration"
+  "name": "Transconjurfiguration",
   "description": "A disaster of combining things"
 }
 

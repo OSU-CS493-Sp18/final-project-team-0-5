@@ -39,7 +39,7 @@ function insertNewAttribute(attribute, mysqlPool) {
 router.post('/', function (req, res, next) {
   const mysqlPool = req.app.locals.mysqlPool;
   if (validation.validateAgainstSchema(req.body, attributeSchema)) {
-    insertNewAttribute(attribute, mysqlPool)
+    insertNewAttribute(req.body, mysqlPool)
       .then((id) => {
         res.status(201).json({
           id: id,
